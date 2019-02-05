@@ -33,6 +33,7 @@ module.exports = {
       if (!response) {
         throw "Could not create new lobby";
       }
+      console.log(response);
       ws.send("hostGame: " + response);
     } catch (error) {
       console.log(error);

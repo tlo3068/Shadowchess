@@ -17,5 +17,17 @@ module.exports = {
         client.send(`broadcast -> ${new_message}`);
       }
     });
+  },
+  async dataCompile(req) {
+    try {
+      let data = req.toJSON();
+      let response = {
+        OK: true,
+        data
+      };
+      return JSON.stringify(response);
+    } catch (err) {
+      throw err;
+    }
   }
 };

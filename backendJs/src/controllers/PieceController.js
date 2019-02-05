@@ -1,5 +1,5 @@
 const { Piece } = require("../models");
-
+const { dataCompile } = require("./SocketHelpers");
 module.exports = {
   // Returns piece instance
   async getAllPiece(req, res) {

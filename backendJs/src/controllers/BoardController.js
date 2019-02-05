@@ -1,16 +1,15 @@
 const { Board, Piece } = require("../models");
-
+const { dataCompile } = require("./SocketHelpers");
 module.exports = {
   async getAllBoard(req, res) {
-    console.log("attempting to get game info");
-    const board = await Board.findAll();
-    console.log("board", board);
-    if (!board) {
-      return res.status(403).send({
-        error: "No board found"
-      });
-    } else {
-      res.send(board);
+    try {
+      const board = await Board.findAll();
+      if (!board) {
+        throw "No board found";
+      }
+      return dataCompile(board);
+    } catch (err) {
+      return err;
     }
   },
   // Requires boardID
@@ -40,10 +39,9 @@ module.exports = {
           }
         };
       });
-      res.send(newBoard);
-    } catch (e) {
-      console.log(e);
-      res.status(400).send(e);
+      return dataCompile(newBoard);
+    } catch (err) {
+      return err;
     }
   },
 
@@ -54,120 +52,150 @@ module.exports = {
     try {
       console.log("adding piece");
       const piece = await Piece.create(req);
-      const pieceJson = piece.toJSON();
-      console.log(pieceJson);
-      res.send(pieceJson);
+      if (!piece) {
+        throw "Could not remove piece";
+      }
+      return dataCompile(piece);
     } catch (err) {
-      res.status(400).send({
-        error: "Could not create piece"
-      });
+      return err;
     }
   },
   // requires boardID and pieceID
   // Returns message
   async removePiece(req, res) {
-    const piece = await Board.findOne({
-      where: {
-        boardID: req.boardID,
-        pieceID: req.pieceID
+    try {
+      const piece = await Board.findOne({
+        where: {
+          boardID: req.boardID,
+          pieceID: req.pieceID
+        }
+      });
+      if (!piece) {
+        throw "Could not remove piece";
       }
-    });
-    if (!piece) {
-      return res.status(403).send({
-        error: "No piece found"
-      });
-    } else {
       piece.destroy().then(() => {});
-      res.send({
-        message: "Piece destroyed"
-      });
+      dataCompile(piece);
+    } catch (err) {
+      return err;
     }
   },
   // Requires pieceID and new position_x
   // returns new piece information
   async movePiece(req, res) {
-    console.log("moving piece");
-    const piece = await Board.findOne({
-      where: {
-        boardID: req.boardID,
-        position_x: req.i_position_x,
-        position_y: req.i_position_y
-      }
-    });
-    // console.log("piece", piece.toJSON());
-    if (!piece) {
-      return res.status(403).send({
-        error: "No piece found"
+    try {
+      console.log(req);
+      const piece = await Board.findOne({
+        where: {
+          boardID: req.boardID,
+          position_x: req.i_position_x,
+          position_y: req.i_position_y
+        }
       });
-    } else {
+      if (!piece) {
+        throw "Could not move piece";
+      }
       const pieceInfo = await Piece.findOne({
         where: {
           pieceID: piece.pieceID
         }
       });
-      // Movement depends on
-      // Piece type
-      // Valid move (within new position_x)
-      // Valid move (checked)
-      // Valid move (another piece blocking)
+      if (!pieceInfo) {
+        throw "Could not move piece";
+      }
 
-      // Special cases
-      // En passant
-      // Castle
-
-      // console.log(pieceInfo.name, pieceInfo.team);
-      // console.log(
-      //   req.f_position_y,
-      //   req.i_position_y,
-      //   req.f_position_x,
-      //   req.i_position_x,
-      //   req.f_position_y - req.i_position_y,
-      //   req.f_position_x - req.i_position_x
-      // );
       if (
         req.f_position_y - req.i_position_y === 0 &&
         req.f_position_x - req.i_position_x === 0
       ) {
-        return res.status(403).send({
-          error: "cannot move piece"
-        });
+        throw "Could not move piece";
       }
+
+      // console.log("success ");
+      console.log(pieceInfo.toJSON());
+      let dist_x = req.f_position_x - req.i_position_x;
+      let dist_y = req.f_position_y - req.i_position_y;
       if (pieceInfo.name === "pawn") {
         // Check movement
         if (pieceInfo.team === "white") {
-          if (
-            !(
-              req.f_position_x - req.i_position_x === 0 &&
-              req.f_position_y - req.i_position_y === 1
-            )
-          ) {
-            return res.status(403).send({
-              error: "cannot move piece"
-            });
+          let valid = 0;
+          if (dist_x === 0 && dist_y === 1) {
+            valid = 1;
           }
+          if (req.i_position_y === 2 && dist_x === 0 && dist_y === 2) {
+            valid = 1;
+          }
+          const destPiece = await Board.findOne({
+            where: {
+              boardID: req.boardID,
+              position_x: req.i_position_x + 1,
+              position_y: req.i_position_y + 1
+            }
+          });
+          if (dist_x === 1 && dist_y === 1 && destPiece) {
+            valid = 1;
+          }
+          const destPiece2 = await Board.findOne({
+            where: {
+              boardID: req.boardID,
+              position_x: req.i_position_x - 1,
+              position_y: req.i_position_y + 1
+            }
+          });
+          if (dist_x === -1 && dist_y === 1 && destPiece2) {
+            valid = 1;
+          }
+          if (valid === 0) {
+            throw "Could not move piece";
+          }
+          console.log("success");
         } else if (pieceInfo.team === "black") {
-          if (
-            !(
-              req.f_position_x - req.i_position_x === 0 &&
-              req.f_position_y - req.i_position_y === -1
-            )
-          ) {
-            return res.status(403).send({
-              error: "cannot move piece"
-            });
+          let valid = 0;
+          if (dist_x === 0 && dist_y === -1) {
+            valid = 1;
+          }
+          if (req.i_position_y === 7 && dist_x === 0 && dist_y === -2) {
+            valid = 1;
+          }
+          const destPiece = await Board.findOne({
+            where: {
+              boardID: req.boardID,
+              position_x: req.i_position_x + 1,
+              position_y: req.i_position_y - 1
+            }
+          });
+          if (dist_x === 1 && dist_y === -1 && destPiece) {
+            valid = 1;
+          }
+          const destPiece2 = await Board.findOne({
+            where: {
+              boardID: req.boardID,
+              position_x: req.i_position_x - 1,
+              position_y: req.i_position_y - 1
+            }
+          });
+          if (dist_x === -1 && dist_y === -1 && destPiece2) {
+            valid = 1;
+          }
+          if (valid === 0) {
+            throw "Could not move piece";
           }
         }
       } else if (pieceInfo.name === "rook") {
-        if (
-          !(
-            req.f_position_y - req.i_position_y === 0 ||
-            req.f_position_x - req.i_position_x === 0
-          )
-        ) {
-          return res.status(403).send({
-            error: "cannot move piece"
-          });
+        if (!(dist_y === 0 || dist_x === 0)) {
+          throw "Could not move piece";
         }
+        if (
+          !(await rookmovement(
+            req.i_position_x,
+            req.f_position_x,
+            req.i_position_y,
+            req.f_position_y,
+            req.boardID
+          ))
+        ) {
+          throw "Could not move piece";
+        }
+
         // Check movement
       } else if (pieceInfo.name === "knight") {
         if (
@@ -190,9 +218,7 @@ module.exports = {
             )
           )
         ) {
-          return res.status(403).send({
-            error: "cannot move piece"
-          });
+          throw "Could not move piece";
         }
         // Check movement
       } else if (pieceInfo.name === "bishop") {
@@ -201,9 +227,30 @@ module.exports = {
           Math.abs(req.f_position_y - req.i_position_y) !==
           Math.abs(req.f_position_x - req.i_position_x)
         ) {
-          return res.status(403).send({
-            error: "cannot move piece"
-          });
+          throw "Could not move piece";
+        }
+        if (
+          !(await rookmovement(
+            req.i_position_x,
+            req.f_position_x,
+            req.i_position_y,
+            req.f_position_y,
+            req.boardID
+          ))
+        ) {
+          console.log("Move not successful");
+          throw "Could not move piece";
+        } else {
+          console.log("Move successful");
+          console.log(
+            rookmovement(
+              req.i_position_x,
+              req.f_position_x,
+              req.i_position_y,
+              req.f_position_y,
+              req.boardID
+            )
+          );
         }
       } else if (pieceInfo.name === "queen") {
         if (
@@ -214,9 +261,18 @@ module.exports = {
               Math.abs(req.f_position_x - req.i_position_x)
           )
         ) {
-          return res.status(403).send({
-            error: "cannot move piece"
-          });
+          throw "Could not move piece";
+        }
+        if (
+          !(await rookmovement(
+            req.i_position_x,
+            req.f_position_x,
+            req.i_position_y,
+            req.f_position_y,
+            req.boardID
+          ))
+        ) {
+          throw "Could not move piece";
         }
 
         // Check movement
@@ -225,15 +281,11 @@ module.exports = {
           Math.abs(req.f_position_y - req.i_position_y) > 1 ||
           Math.abs(req.f_position_x - req.i_position_x) > 1
         ) {
-          return res.status(403).send({
-            error: "Cannot move piece"
-          });
+          throw "Could not move piece";
         }
         // Check movement
       } else {
-        return res.status(403).send({
-          error: "Cannot move piece"
-        }); // false
+        throw "Could not move piece";
       }
       const destPiece = await Board.findOne({
         where: {
@@ -248,11 +300,11 @@ module.exports = {
             pieceID: destPiece.pieceID
           }
         });
-        console.log(destPieceInfo.team, pieceInfo.team);
+        if (!destPieceInfo) {
+          throw "Could not move piece";
+        }
         if (destPieceInfo.team === pieceInfo.team) {
-          return res.status(403).send({
-            error: "Cannot move piece"
-          });
+          throw "Could not move piece";
         }
       }
       await Board.destroy({
@@ -262,17 +314,33 @@ module.exports = {
           position_y: req.f_position_y
         }
       });
-
-      console.log(piece.toJSON());
       piece
         .update({
           position_x: req.f_position_x,
           position_y: req.f_position_y
         })
         .then(() => {});
-      console.log("moved piece");
-      console.log(piece.toJSON());
-      res.send(piece);
+
+      let data = {
+        boardID: req.boardID,
+        initial: {
+          position_x: req.i_position_x,
+          position_y: req.i_position_y
+        },
+        final: {
+          position_x: req.f_position_x,
+          position_y: req.f_position_y
+        },
+        special: null
+      };
+      let response = {
+        OK: true,
+        data
+      };
+      return JSON.stringify(response);
+      // return dataCompile(data);
+    } catch (err) {
+      return err;
     }
   },
   // requires boardID
@@ -475,12 +543,34 @@ module.exports = {
           position_y: 8
         }
       ]);
-      res.send(board);
-    } catch (err) {
-      console.log(err);
-      res.status(400).send({
-        error: "Could not create piece"
+      if (!board) {
+        throw "Could not start board";
+      }
+      // console.log(board.toJSON());
+      // console.log(JSON.stringify(board));
+      const pieces = await Promise.all(
+        board.map(piece => Piece.findOne({ where: { pieceID: piece.pieceID } }))
+      );
+      const newBoard = board.map(piece => {
+        const pieceData = pieces.find(p => p.pieceID === piece.pieceID);
+        return {
+          boardID: piece.boardID,
+          position_x: piece.position_x,
+          position_y: piece.position_y,
+          pieceData: {
+            team: pieceData.team,
+            name: pieceData.name
+          }
+        };
       });
+      let response = {
+        OK: true,
+        data: newBoard
+      };
+      return JSON.stringify(response);
+      // return dataCompile(board);
+    } catch (err) {
+      return err;
     }
   },
   // Requires pieceID and position_x
@@ -495,12 +585,12 @@ module.exports = {
           boardID: req.query.boardID
         }
       });
-      res.send(piece);
-    } catch (error) {
-      console.log(error);
-      res.status(400).send({
-        error: "Could not find piece"
-      });
+      if (!piece) {
+        throw "Could not get piece by location";
+      }
+      return dataCompile(piece);
+    } catch (err) {
+      return err;
     }
   }
 };
@@ -510,5 +600,52 @@ knightmovement = (ix, fx, iy, fy, x, y) => {
     return true;
   } else {
     return false;
+  }
+};
+validPosition = (column, row) => {
+  return column <= 8 && column > 0 && row <= 8 && row > 0;
+};
+
+rookmovement = async (ix, fx, iy, fy, id) => {
+  try {
+    let index = 1;
+    let counter_x = 0;
+    let counter_y = 0;
+    let dist_y = fy - iy;
+    let dist_x = fx - ix;
+    let total_distance = Math.max(Math.abs(dist_y), Math.abs(dist_x));
+    while (index < total_distance) {
+      if (dist_y < 0) {
+        counter_y--;
+      }
+      if (dist_y > 0) {
+        counter_y++;
+      }
+      if (dist_x < 0) {
+        counter_x--;
+      }
+      if (dist_x > 0) {
+        counter_x++;
+      }
+      let new_pos_x = ix + counter_x;
+      let new_pos_y = iy + counter_y;
+      let destPiece = await Board.findOne({
+        where: {
+          boardID: id,
+          position_x: new_pos_x,
+          position_y: new_pos_y
+        }
+      });
+      console.log("checking x: " + new_pos_x + "; y: " + new_pos_y);
+      if (destPiece) {
+        console.log("not null");
+        return false;
+      }
+
+      index++;
+    }
+    return true;
+  } catch (error) {
+    throw error;
   }
 };

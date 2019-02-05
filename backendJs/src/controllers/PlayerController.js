@@ -1,41 +1,36 @@
 const { Player } = require("../models");
-
+const { dataCompile } = require("./SocketHelpers");
 module.exports = {
   // requires playerID
   // Returns player information
   async getAllPlayer(req, res) {
     // res.send("getting player info");
-    console.log("attempting to get player info");
-    const player = await Player.findAll();
-    console.log("player", player.toJSON());
-    if (!player) {
-      return res.status(403).send({
-        error: "No player found"
-      });
-    } else {
-      const playerJson = player.toJSON();
-      res.send({
-        player: playerJson
-      });
-      // res.send("getting game");
+    try {
+      const player = await Player.findAll();
+      if (!player) {
+        throw "Could not get all players";
+      }
+      return dataCompile(player);
+    } catch (err) {
+      return err;
     }
   },
   // requires playerID
   // Returns player information
   async getPlayer(req, res) {
     // res.send("getting player info");
-    console.log("attempting to get player info");
-    const player = await Player.findOne({
-      where: {
-        playerID: req.query.playerID
+    try {
+      const player = await Player.findOne({
+        where: {
+          playerID: req.query.playerID
+        }
+      });
+      if (!player) {
+        throw "Could not get player";
       }
-    });
-    console.log("player", player.toJSON());
-    if (!player) {
-      return res.status(403).send("No player found");
-    } else {
-      res.send(player);
-      // res.send("getting game");
+      return dataCompile(player);
+    } catch (err) {
+      return err;
     }
   },
   // Requires nothing
@@ -45,15 +40,15 @@ module.exports = {
     try {
       console.log("Creating new player");
       const player = await Player.create();
-      // const playerJson = player.toJSON();
-      // console.log(playerJson);
-      io.emit("message", playerJson);
-      // res.send(playerJson);
-      res.send(player);
+      if (!player) {
+        throw "Could not create player";
+      }
+      return dataCompile(player);
     } catch (err) {
-      res.status(400).send("Could not create new player");
+      return err;
     }
   },
+
   // requires playerID and new team
   // Returns team instance
   async setTeam(req, res) {

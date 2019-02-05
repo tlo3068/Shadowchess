@@ -1,169 +1,141 @@
 const { Game } = require("../models");
+const { dataCompile } = require("./SocketHelpers");
 
 module.exports = {
   // Requires boardID
   // Gets current instance of game
   async getAllGame(req, res) {
-    const game = await Game.findAll();
-    if (!game) {
-      return res.status(403).send({
-        error: "No game found"
-      });
-    } else {
-      res.send(game);
+    try {
+      const game = await Game.findAll();
+      if (!game) {
+        throw "Could not get all games";
+      }
+      return dataCompile(game);
+    } catch (err) {
+      return err;
     }
   },
   // Requires boardID
   // Gets current instance of game
   async getGame(req, res) {
-    console.log("attempting to get game info");
-    const game = await Game.findOne({
-      where: {
-        boardID: req.query.boardID
-      }
-    });
-    console.log("game", game.toJSON());
-    if (!game) {
-      return res.status(403).send({
-        error: "No game found"
+    try {
+      const game = await Game.findOne({
+        where: {
+          boardID: req.query.boardID
+        }
       });
-    } else {
-      res.send(game);
+      console.log("game", game.toJSON());
+      if (!game) {
+        throw "Could not get game";
+      }
+      return dataCompile(game);
+    } catch (err) {
+      return err;
     }
   },
   // requires playerAID
   // Returns a game instance
   async hostGame(req, res) {
     try {
-      console.log("Starting new game");
-      console.log("host req body = ", req);
-      let data = {
-        playerAID: req.playerAID
-      };
-      const game = await Game.create(data);
-      const gameJson = game.toJSON();
-      console.log(gameJson);
-      res.send(gameJson);
-    } catch (err) {
-      console.log("error found");
-      res.status(400).send({
-        error: "Could not start a new game"
+      const game = await Game.create({
+        playerAID: req.playerID
       });
+      if (!game) {
+        throw "Could not host game";
+      }
+      return dataCompile(game);
+    } catch (err) {
+      return err;
     }
   },
   // Requires boardID and playerID
   // returns updated game instance
   async joinGame(req, res) {
-    console.log("attempting to join game");
-    console.log(req);
-    const game = await Game.findOne({
-      where: {
-        boardID: req.boardID,
-        playerBID: null
-      }
-    });
-    // const game = await Game.findAll();
-    console.log("Game = ", game);
-    if (!game) {
-      return res.status(403).send({
-        error: "No game found"
+    try {
+      const game = await Game.findOne({
+        where: {
+          boardID: req.boardID,
+          playerBID: null
+        }
       });
-    } else {
-      console.log("game", game.toJSON());
-      console.log("req body", req);
+      if (!game) {
+        throw "No game found";
+      }
       game
         .update({
           playerBID: req.playerID
         })
         .then(() => {});
-      console.log(game.toJSON());
-      const gameJson = game.toJSON();
-      res.send({
-        game: gameJson
-      });
+      return dataCompile(game);
+    } catch (err) {
+      return err;
     }
-    // res.send("joining game");
   },
   // Requires playerBID
   // returns game instance
   async leaveGame(req, res) {
-    console.log("attempting to leave game");
-    const { boardID } = req;
-    const game = await Game.findOne({
-      where: {
-        boardID: boardID
-      }
-    });
-    console.log("game", game.toJSON());
-    if (!game) {
-      return res.status(403).send({
-        error: "No game found"
+    try {
+      const game = await Game.findOne({
+        where: {
+          boardID: req.boardID
+        }
       });
-    } else {
+      if (!game) {
+        throw "Could not leave game";
+      }
       game
         .update({
           playerBID: null
         })
         .then(() => {});
-      console.log(game.toJSON());
-      const gameJson = game.toJSON();
-      res.send({
-        game: gameJson
-      });
+      return dataCompile(game);
+    } catch (err) {
+      return err;
     }
   },
   // Requires boardID
   // Returns game instance
   async startGame(req, res) {
-    // res.send("starting game");
-    console.log("attempting to start game");
-    const { boardID } = req;
-    const game = await Game.findOne({
-      where: {
-        boardID: boardID
+    try {
+      const game = await Game.findOne({
+        where: {
+          boardID: req.boardID
+        }
+      });
+      if (!game) {
+        throw "Could not start game";
       }
-    });
-    console.log("game", game.toJSON());
-    if (!game) {
-      return res.status(403).send({
-        error: "No game found"
-      });
-    } else if (game.playerBID === null) {
-      return res.status(403).send({
-        error: "Cannot start game"
-      });
-    } else {
+      if (game.playerBID === null) {
+        throw "Could not start game";
+      }
       game
         .update({
           running: true,
           turn: "white"
         })
         .then(() => {});
-      console.log(game.toJSON());
-      const gameJson = game.toJSON();
-      res.send(gameJson);
+      return dataCompile(game);
+    } catch (err) {
+      return err;
     }
   },
   // Requires boardID
   // returns message
   async endGame(req, res) {
     // res.send("deleting game");
-    const { boardID } = req;
-    const game = await Game.findOne({
-      where: {
-        boardID: boardID
+    try {
+      const game = await Game.findOne({
+        where: {
+          boardID: req.boardID
+        }
+      });
+      if (!game) {
+        throw "Could not end game";
       }
-    });
-    console.log("game", game.toJSON());
-    if (!game) {
-      return res.status(403).send({
-        error: "No game found"
-      });
-    } else {
       game.destroy().then(() => {});
-      res.send({
-        message: "Game destroyed"
-      });
+      return dataCompile(game);
+    } catch (err) {
+      return err;
     }
   }
 };
