@@ -102,90 +102,63 @@ module.exports = {
       if (!pieceInfo) {
         throw "Could not move piece";
       }
-
-      if (
-        req.f_position_y - req.i_position_y === 0 &&
-        req.f_position_x - req.i_position_x === 0
-      ) {
-        throw "Could not move piece";
-      }
-
-      // console.log("success ");
-      console.log(pieceInfo.toJSON());
       let dist_x = req.f_position_x - req.i_position_x;
       let dist_y = req.f_position_y - req.i_position_y;
+      if (dist_y === 0 && dist_x === 0) {
+        throw "Could not move piece";
+      }
+      let special = null;
+      // console.log("success ");
+      console.log(pieceInfo.toJSON());
+
       if (pieceInfo.name === "pawn") {
         // Check movement
+        let valid = 0;
         if (pieceInfo.team === "white") {
-          let valid = 0;
           if (dist_x === 0 && dist_y === 1) {
             valid = 1;
           }
           if (req.i_position_y === 2 && dist_x === 0 && dist_y === 2) {
             valid = 1;
           }
-          const destPiece = await Board.findOne({
-            where: {
-              boardID: req.boardID,
-              position_x: req.i_position_x + 1,
-              position_y: req.i_position_y + 1
-            }
-          });
-          if (dist_x === 1 && dist_y === 1 && destPiece) {
-            valid = 1;
-          }
-          const destPiece2 = await Board.findOne({
-            where: {
-              boardID: req.boardID,
-              position_x: req.i_position_x - 1,
-              position_y: req.i_position_y + 1
-            }
-          });
-          if (dist_x === -1 && dist_y === 1 && destPiece2) {
-            valid = 1;
-          }
-          if (valid === 0) {
-            throw "Could not move piece";
-          }
-          console.log("success");
         } else if (pieceInfo.team === "black") {
-          let valid = 0;
           if (dist_x === 0 && dist_y === -1) {
             valid = 1;
           }
           if (req.i_position_y === 7 && dist_x === 0 && dist_y === -2) {
             valid = 1;
           }
-          const destPiece = await Board.findOne({
-            where: {
-              boardID: req.boardID,
-              position_x: req.i_position_x + 1,
-              position_y: req.i_position_y - 1
-            }
-          });
-          if (dist_x === 1 && dist_y === -1 && destPiece) {
-            valid = 1;
+        }
+        let index = pieceInfo.team === "white" ? 1 : -1;
+        const destPiece = await Board.findOne({
+          where: {
+            boardID: req.boardID,
+            position_x: req.i_position_x + 1,
+            position_y: req.i_position_y + index
           }
-          const destPiece2 = await Board.findOne({
-            where: {
-              boardID: req.boardID,
-              position_x: req.i_position_x - 1,
-              position_y: req.i_position_y - 1
-            }
-          });
-          if (dist_x === -1 && dist_y === -1 && destPiece2) {
-            valid = 1;
+        });
+        if (dist_x === 1 && dist_y === index && destPiece) {
+          valid = 1;
+        }
+        const destPiece2 = await Board.findOne({
+          where: {
+            boardID: req.boardID,
+            position_x: req.i_position_x - 1,
+            position_y: req.i_position_y + index
           }
-          if (valid === 0) {
-            throw "Could not move piece";
-          }
+        });
+        if (dist_x === -1 && dist_y === index && destPiece2) {
+          valid = 1;
+        }
+        if (valid === 0) {
+          throw "Could not move piece";
         }
       } else if (pieceInfo.name === "rook") {
         if (!(dist_y === 0 || dist_x === 0)) {
           throw "Could not move piece";
         }
         if (
-          !(await rookmovement(
+          !(await complexMovement(
             req.i_position_x,
             req.f_position_x,
             req.i_position_y,
@@ -230,7 +203,7 @@ module.exports = {
           throw "Could not move piece";
         }
         if (
-          !(await rookmovement(
+          !(await complexMovement(
             req.i_position_x,
             req.f_position_x,
             req.i_position_y,
@@ -243,7 +216,7 @@ module.exports = {
         } else {
           console.log("Move successful");
           console.log(
-            rookmovement(
+            complexMovement(
               req.i_position_x,
               req.f_position_x,
               req.i_position_y,
@@ -264,7 +237,7 @@ module.exports = {
           throw "Could not move piece";
         }
         if (
-          !(await rookmovement(
+          !(await complexMovement(
             req.i_position_x,
             req.f_position_x,
             req.i_position_y,
@@ -277,15 +250,48 @@ module.exports = {
 
         // Check movement
       } else if (pieceInfo.name === "king") {
-        if (
-          Math.abs(req.f_position_y - req.i_position_y) > 1 ||
-          Math.abs(req.f_position_x - req.i_position_x) > 1
-        ) {
-          throw "Could not move piece";
+        let valid = 0;
+        if (Math.abs(dist_y) <= 1 && Math.abs(dist_x) <= 1) {
+          valid = 1;
         }
         // Check movement
+        // Castle
+        if (
+          complexMovement(
+            req.i_position_x,
+            req.f_position_x,
+            req.i_position_y,
+            req.f_position_y,
+            req.boardID
+          )
+        ) {
+          if (
+            req.i_position_x === 5 &&
+            req.i_position_y === 1 &&
+            dist_y === 0 &&
+            dist_x === 2
+          ) {
+            if (verifyPiece(req, pieceInfo.team, "rook")) {
+              special = "KSC";
+              valid = 1;
+            }
+          }
+          if (
+            req.i_position_x === 5 &&
+            req.i_position_y === 1 &&
+            dist_y === 0 &&
+            dist_x === -2
+          ) {
+            special = "QSC";
+            valid = 1;
+          }
+        }
+
+        if (valid === 0) {
+          throw "Could not move piece";
+        }
       } else {
-        throw "Could not move piece";
+        throw "Invalid piece";
       }
       const destPiece = await Board.findOne({
         where: {
@@ -331,7 +337,7 @@ module.exports = {
           position_x: req.f_position_x,
           position_y: req.f_position_y
         },
-        special: null
+        special: special
       };
       let response = {
         OK: true,
@@ -606,7 +612,7 @@ validPosition = (column, row) => {
   return column <= 8 && column > 0 && row <= 8 && row > 0;
 };
 
-rookmovement = async (ix, fx, iy, fy, id) => {
+complexMovement = async (ix, fx, iy, fy, id) => {
   try {
     let index = 1;
     let counter_x = 0;
@@ -647,5 +653,37 @@ rookmovement = async (ix, fx, iy, fy, id) => {
     return true;
   } catch (error) {
     throw error;
+  }
+};
+
+verifyPiece = async (req, team, piece) => {
+  try {
+    let rookPiece = await Board.findOne({
+      where: {
+        boardID: req.boardID,
+        position_x: req.f_position_x,
+        position_y: req.f_position_y
+      }
+    });
+    if (!rookPiece) {
+      return false;
+    }
+    let rookInfo = await Piece.findOne({
+      where: {
+        pieceID: rookPiece.pieceID
+      }
+    });
+    if (rookInfo.team === team && rookInfo.name === piece) {
+      rookPiece
+        .update({
+          position_x: req.i_position_x + 1,
+          position_y: req.i_position_y
+        })
+        .then(() => {});
+      return true;
+    }
+    return false;
+  } catch (err) {
+    throw err;
   }
 };
