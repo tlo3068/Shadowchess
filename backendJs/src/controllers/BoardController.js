@@ -271,19 +271,40 @@ module.exports = {
             dist_y === 0 &&
             dist_x === 2
           ) {
-            if (verifyPiece(req, pieceInfo.team, "rook")) {
+            if (checkAndUpdateRook(req, pieceInfo.team, "rook")) {
               special = "KSC";
               valid = 1;
             }
-          }
-          if (
+          } else if (
+            req.i_position_x === 5 &&
+            req.i_position_y === 8 &&
+            dist_y === 0 &&
+            dist_x === -2
+          ) {
+            if (checkAndUpdateRook(req, pieceInfo.team, "rook")) {
+              special = "KSC";
+              valid = 1;
+            }
+          } else if (
+            req.i_position_x === 5 &&
+            req.i_position_y === 8 &&
+            dist_y === 0 &&
+            dist_x === -2
+          ) {
+            if (checkAndUpdateRook(req, pieceInfo.team, "rook")) {
+              special = "QSC";
+              valid = 1;
+            }
+          } else if (
             req.i_position_x === 5 &&
             req.i_position_y === 1 &&
             dist_y === 0 &&
             dist_x === -2
           ) {
-            special = "QSC";
-            valid = 1;
+            if (checkAndUpdateRook(req, pieceInfo.team, "rook")) {
+              special = "QSC";
+              valid = 1;
+            }
           }
         }
 
@@ -656,7 +677,7 @@ complexMovement = async (ix, fx, iy, fy, id) => {
   }
 };
 
-verifyPiece = async (req, team, piece) => {
+checkAndUpdateRook = async (req, team, piece) => {
   try {
     let rookPiece = await Board.findOne({
       where: {
